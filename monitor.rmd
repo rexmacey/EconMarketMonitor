@@ -22,7 +22,7 @@ library(tis)
 Quandl.api_key(Sys.getenv("QUANDL_TOKEN"))
 
 std_chart<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
-                    main=NULL,xlab="",ylab="",recession_shading=TRUE){
+                    main=NULL,xlab="",ylab="",recession_shading=TRUE, hline=NULL){
     data<-Quandl(qcode,type=type,transform,collapse)
     if(recession_shading){
             recessions<-nberDates()
@@ -47,6 +47,9 @@ std_chart<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
     if (recession_shading) {
         out<-out + geom_rect(data=recessions.trim,
                    aes(xmin=Start,xmax=End,ymin=min(data$VALUE),ymax=Inf), fill="darkgray",alpha=0.2)}
+    if (!is.null(hline)){
+        out<-out+geom_hline(yintercept=hline, col="lightblue")
+    }
     return(out)
 }
 ```
@@ -72,6 +75,22 @@ std_chart(qcode=code<-"FRED/CPIAUCSL",
           logscale=NULL,
           main="Inflation: CPI - All Items",
           xlab="",
-          ylab="% Change")
+          ylab="% Change",
+          hline=0)
 
+std_chart(qcode=code<-"FRED/CPILFESL",
+          transform="rdiff",
+          logscale=NULL,
+          main="Core Inflation: CPI x Food and Energy",
+          xlab="",
+          ylab="% Change",
+          hline=0)
+
+std_chart(qcode=code<-"FRED/UNRATE",
+          transform=NULL,
+          logscale=NULL,
+          main="Core Inflation: CPI x Food and Energy",
+          xlab="",
+          ylab="% Change",
+          hline=0)
 ```
