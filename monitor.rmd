@@ -1,30 +1,90 @@
 ---
 title: "Economic and Market Monitor"
-author: "Red Tortoise"
+author: "Red Tortoise, LLC"
 date: "May 12, 2016"
 header-includes:
 - \usepackage{fancyhdr}
 - \pagestyle{fancy}
-- \fancyhead[CO,CE]{This is fancy header}
-- \fancyfoot[CO,CE]{And this is a fancy footer}
+- \fancyhead[CO,CE]{Economic and Market Monitor}
+- \fancyfoot[CO,CE]{www.redtortoisellc.com}
 - \fancyfoot[LE,RO]{\thepage}
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, error = FALSE)
 ```
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
-library(Quandl)
+
 library(ggplot2)
 library(xts)
 library(tis)
+library(Quandl)
 Quandl.api_key(Sys.getenv("QUANDL_TOKEN"))
 
-std_chart1<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
-                    main=NULL,xlab="",ylab="",recession_shading=TRUE, hline=NULL,
-                    trend=NULL){
-    data<-Quandl(qcode,type=type,transform,collapse)
+#' Produces standard chart. 
+
+#' The most frequent template for a chart in this package. It is contemplated that not all charts will fit into this template and custom charts will be used. 
+
+#' param qcode Quandl code used in Quandl function.  
+#' param type Type of series returned by Quandl function, passed to Quandl. 
+#' param transform Transform of data. Passed to Quandl function.  'annpct' is an exception. Calculates an
+#'  annual percent change.
+#' param collaps Collapse argument passed to Quandl function
+#' param logscale Logscale arguement use in ggplot2
+#' param main, xlab, ylab Labels passed to ggplot
+#' param recession_shading True produces rectangular rectangles for recessions
+#' param hline Horizontal line. Specify numeric value or 'mean' for the average
+#' param trend Trend line. May be 'log' or 'linear'
+std_chart<-function(qcode, type="raw", transform= NULL, collapse=NULL, logscale="",
+                    main="", xlab="", ylab="", recession_shading=TRUE, hline="",
+                    trend=""){
+    annpct<-FALSE
+    if (!missing(transform)){
+        if (transform=="annpct") { # a special transform not part of Quandl
+            transform<-NULL # use this for the Quandl call
+            annpct<-TRUE
+        } 
+    }
+    
+    qdata<-Quandl(code=qcode,transform=transform,collapse=collapse)
+    data.freq<-attr(qdata,"freq")
+    obsperyr<-switch(data.freq,
+                 daily=365,
+                 weekly=52,
+                 quarterly=4,
+                 monthly=12,
+                 annual=1)
+    if (nrow(qdata)==0){
+        stop(paste("No rows returned in call to Quandl with code",qcode))
+    }
+    data<-qdata
+    if ("Last" %in% colnames(qdata)) {
+        data<-data.frame(DATE=qdata$Date,VALUE=qdata$Last)
+    }
+    if ("VALUE" %in% colnames(qdata)) {
+        data<-data.frame(DATE=qdata$DATE,VALUE=qdata$VALUE)
+    }
+    if ("Value" %in% colnames(qdata)) {
+        data<-data.frame(DATE=qdata$Date,VALUE=qdata$Value)
+    }
+    if ("Adjusted Close" %in% colnames(qdata)) {
+        data<-data.frame(DATE=qdata$Date,VALUE=qdata[,"Adjusted Close"])
+    }
+    if ("VIX Close" %in% colnames(qdata)) {
+        data<-data.frame(DATE=qdata$Date,VALUE=qdata[,"VIX Close"])
+    }
+    if ("Settle" %in% colnames(qdata)) {
+        data<-data.frame(DATE=qdata$Date,VALUE=qdata[,"Settle"])
+    }
+    if (nrow(data)==0){
+        stop(paste("No rows when Quandl coverted to data with code",qcode))
+    }
+    if (annpct){
+        data<-data.frame(
+            DATE=data$DATE[1:(nrow(data)-obsperyr)],
+            VALUE=rollapply(data$VALUE,obsperyr+1,function (x) 100*x[1]/x[obsperyr+1]-100))
+    }
     if (trend=="log"){
         data.trend<-data.frame(y=log(data$VALUE),x=as.numeric(data$DATE))
         new<-data.frame(x=data.trend$x)
@@ -54,15 +114,18 @@ std_chart1<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL
     }
     out<-ggplot(data=data)+geom_line(aes(x=DATE,y=VALUE),color="red")+ 
         labs(title=main,x=xlab,y=ylab)+
-        scale_fill_manual(values=cbPalette) 
-    out<- out + theme_bw()
-    if (!is.null(logscale))  {
+        scale_fill_manual(values=cbPalette)
+    if (trend!=""){
+        out<-out+geom_line(aes(x=DATE,y=TREND),color="darkgray",data=data.trend)
+    }
+    out<- out + theme_bw()+theme(plot.title=element_text(size=10, face="bold"),axis.title=element_text(size=10))
+    if (logscale!="") {
         out<-out + scale_y_continuous(trans = logscale)
     }    
     if (recession_shading) {
         out<-out + geom_rect(data=recessions.trim,
                    aes(xmin=Start,xmax=End,ymin=min(data$VALUE),ymax=Inf), fill="darkgray",alpha=0.2)}
-    if (!is.null(hline)){
+    if (hline!=""){
         if (is.numeric(hline)){
             out<-out+geom_hline(yintercept=hline, col="lightblue")    
         } else {
@@ -70,150 +133,137 @@ std_chart1<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL
             out<-out+geom_hline(yintercept=temp, col="lightblue")
         }
     }
-    if (!is.null(trend)){
-        out<-out+geom_line(aes(x=DATE,y=TREND,color="darkgray"),data=data.trend)
-    }
+    
     return(out)
 }
 
-std_chart<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
-                    main=NULL,xlab="",ylab="",recession_shading=TRUE, hline=NULL){
-    data<-Quandl(qcode,type=type,transform,collapse)
-    if(recession_shading){
-            recessions<-nberDates()
-            temp<-as.Date(as.character(recessions),"%Y%m%d")
-            recessions<-data.frame(Start=temp[seq(1,nrow(recessions))],
-                                   End=temp[(nrow(recessions)+1):(nrow(recessions)*2)])
-            recessions.trim<-subset(recessions,End>=min(data$DATE))
-            if (nrow(recessions.trim)<1) {
-                recession.shading<-FALSE # no recessions to shade
-            } else {
-                if (recessions.trim$Start[1]<min(data$DATE)) {recessions.trim$Start[1]<-min(data$DATE)}
-            }
-            
-    }
-    out<-ggplot(data=data)+geom_line(aes(x=DATE,y=VALUE),color="red")+ 
-        labs(title=main,x=xlab,y=ylab)+
-        scale_fill_manual(values=cbPalette) 
-    out<- out + theme_bw()
-    if (!is.null(logscale))  {
-        out<-out + scale_y_continuous(trans = logscale)
-    }    
-    if (recession_shading) {
-        out<-out + geom_rect(data=recessions.trim,
-                   aes(xmin=Start,xmax=End,ymin=min(data$VALUE),ymax=Inf), fill="darkgray",alpha=0.2)}
-    if (!is.null(hline)){
-        if (is.numeric(hline)){
-            out<-out+geom_hline(yintercept=hline, col="lightblue")    
-        } else {
-            temp<-do.call(hline,list(data$VALUE))
-            out<-out+geom_hline(yintercept=temp, col="lightblue")
-        }
-        
-    }
-    return(out)
-}
 ```
-
-## Economic Data
 
 ```{r echo=FALSE, fig.width=3.5, fig.height=3.5}
 par(mfrow=c(1,2))
 
-std_chart(qcode=code<-"FRED/GDP",
-          transform="rdiff",
-          logscale<-"log10",
-          main="Gross Domestic Product (GDP) Value",
-          xlab="",
+std_chart(qcode="FRED/GDPC96",
+          logscale="log10",
+          main="Real Gross Domestic Product (GDP) Value",
           ylab="Billions of Dollars",
-          hline=NULL)
+          trend="log")
 
-std_chart(qcode=code<-"FRED/GDP",
-          transform="rdiff",
-          logscale<-NULL,
-          main="Gross Domestic Product (GDP) % Change",
-          xlab="",
-          ylab="% Change",
-          hline=0)
+std_chart(qcode="FRED/GDPC96",
+          transform="annpct",
+          main="Real Gross Domestic Product (GDP) % Change",
+          ylab="Annual % Change",
+          hline="mean",
+          trend="linear")
 
-std_chart(qcode=code<-"FRED/CPIAUCSL",
-          transform="rdiff",
-          logscale=NULL,
+std_chart(qcode="FRED/CPIAUCSL",
+          transform="annpct",
           main="Inflation: CPI - All Items",
-          xlab="",
-          ylab="% Change",
-          hline=0)
+          ylab="Annual % Change",
+          hline="mean")
 
-std_chart(qcode=code<-"FRED/CPILFESL",
-          transform="rdiff",
-          logscale=NULL,
+std_chart(qcode="FRED/CPILFESL",
+          transform="annpct",
           main="Core Inflation: CPI x Food and Energy",
-          xlab="",
-          ylab="% Change",
-          hline=0)
+          ylab="Annual % Change",
+          hline="mean")
 
-std_chart(qcode=code<-"FRED/UNRATE",
-          transform=NULL,
-          logscale=NULL,
+std_chart(qcode="FRED/UNRATE",
           main="Unemployment Rate",
-          xlab="",
           ylab="%",
           hline="mean")
 
-std_chart(qcode=code<-"FRED/ALTSALES",
-          transform=NULL,
-          logscale=NULL,
+std_chart(qcode="FRED/ALTSALES",
           main="Auto & Light Truck Sales",
-          xlab="",
           ylab="Millions of Units",
-          hline="mean")
+          hline="mean",
+          trend="linear")
 
-std_chart(qcode=code<-"FRED/MEHOINUSA672N",
-          transform=NULL,
-          logscale=NULL,
+std_chart(qcode="FRED/MEHOINUSA672N",
           main="Real Median Household Income",
-          xlab="",
           ylab="Dollars",
           hline="mean")
 
-std_chart(qcode=code<-"FRED/DSPI",
-          transform=NULL,
+std_chart(qcode="FRED/DSPI",
           logscale="log2",
           main="Disposable Personal Income",
-          xlab="",
           ylab="Billions of Dollars",
-          hline=NULL)
+          trend="log")
 
-std_chart(qcode=code<-"FRED/HOUST",
-          transform=NULL,
-          logscale=NULL,
+std_chart(qcode="FRED/HOUST",
           main="Housing Starts: New Privately Owned",
-          xlab="",
           ylab="Thousands of Units",
           hline="mean")
 
-std_chart(qcode=code<-"FRED/T10YIE",
-          transform=NULL,
-          logscale=NULL,
+std_chart(qcode="FRED/T10YIE",
           main="10Yr Breakeven Inflation Rate",
-          xlab="",
+          ylab="%",
+          hline="mean")
+
+std_chart(qcode="FRED/CP",
+          logscale="log2",
+          main="Corporate Profits After-Tax",
+          ylab="Billions of Dollars",
+          trend="log")
+
+std_chart(qcode="FRED/STLFSI",
+          main="St. Louis Fed Fin'l Stress Index",
+          ylab="Index",
+          hline=0)
+
+std_chart(qcode="CHRIS/CME_CL1",
+          main="Oil: WTI Crude",
+          ylab="Price",
+          collapse="monthly",
+          hline=0)
+
+std_chart(qcode="CHRIS/ICE_B1",
+          main="Oil: Brent Crude",
+          ylab="Price",
+          collapse="monthly",
+          hline=0)
+
+std_chart(qcode="MULTPL/SHILLER_PE_RATIO_MONTH",
+          main="Valuation: Shiller P/E",
+          ylab="P/E",
+          hline="mean")
+
+std_chart(qcode="FRED/DGS10",
+          main="Interest Rates: 10Yr Tsy Const Mat",
           ylab="Rate %",
           hline="mean")
 
-std_chart1(qcode=code<-"FRED/CP",
-          transform=NULL,
-          logscale="log2",
-          main="Corporate Profits After Tax",
-          xlab="",
-          ylab="Billions of Dollars",
-          hline=NULL,
-          trend="log")
+std_chart(qcode="FRED/DGS2",
+          main="Interest Rates: 2Yr Tsy Const Mat",
+          ylab="Rate %",
+          hline="mean")
 
-std_chart(qcode=code<-"FRED/STLFSI",
-          transform=NULL,
-          logscale=NULL,
-          main="St. Louis Fed Fin'l Stress Idx",
-          xlab="",
+std_chart(qcode="FRED/DTB3",
+          main="Interest Rates: 3Mo Tsy Bill",
+          ylab="Rate %",
+          hline="mean")
+
+std_chart(qcode="CBOE/VIX",
+          main="Volatility: VIX",
+          ylab="VIX Index",
+          hline="mean")
+
+std_chart(qcode="FRED/DTWEXM",
+          main="US Dollar v Major Currencies",
+          ylab="Trade-Wtd Index",
+          hline="mean")
+
+std_chart(qcode="FRED/DTWEXB",
+          main="US Dollar v Broad",
+          ylab="Trade-Wtd Index",
+          hline="mean")
+
+std_chart(qcode="YAHOO/INDEX_GSPC",
+          main="S&P 500 Index",
           ylab="Index",
-          hline=0)
+          logscale = "log2",
+          trend="log")
 ```
+
+Source: [Quandl](www.quandl.com) (codes include: FRED/GDPC96, FRED/CPIAUCSL, FRED/CPILFESL, FRED/UNRATE, FRED/ALTSALES, FRED/MEHOINUSA672N, FRED/DSPI, FRED/HOUST, FRED/T10YIE, FRED/CP, FRED/STLFSI, CHRIS/CME_CL1, CHRIS/ICE_B1, MULTPL/SHILLER_PE_RATIO_MONTH, FRED/DGS10, FRED/DGS2, FRED/DTB3, CBOE/VIX, FRED/DTWEXM, FRED/DTWEXB, YAHOO/INDEX_GSPC)
+
+Red Tortoise does not guaranty or make any warranties about the accuracy or completeness of this data. Some data may be inaccurate, incomplete or unfit for a particular purpose.  This document does not contain investment advice.
