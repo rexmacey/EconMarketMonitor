@@ -21,6 +21,7 @@ library(xts)
 library(tis)
 library(Quandl)
 Quandl.api_key(Sys.getenv("QUANDL_TOKEN"))
+chart.master<-read.csv("EconAndMktMonitor.csv",header=TRUE,stringsAsFactors = FALSE)
 
 #' Produces standard chart. 
 
@@ -40,13 +41,12 @@ std_chart<-function(qcode, type="raw", transform= NULL, collapse=NULL, logscale=
                     main="", xlab="", ylab="", recession_shading=TRUE, hline="",
                     trend=""){
     annpct<-FALSE
-    if (!missing(transform)){
-        if (transform=="annpct") { # a special transform not part of Quandl
-            transform<-NULL # use this for the Quandl call
-            annpct<-TRUE
-        } 
-    }
-    
+    if (missing(transform)) {transform<-NULL}
+    if (!is.null(transform)){
+      if(transform=="annpct") {
+          annpct<-TRUE
+          transform<-NULL}  
+    } 
     qdata<-Quandl(code=qcode,transform=transform,collapse=collapse)
     data.freq<-attr(qdata,"freq")
     obsperyr<-switch(data.freq,
@@ -139,131 +139,37 @@ std_chart<-function(qcode, type="raw", transform= NULL, collapse=NULL, logscale=
 
 ```
 
-```{r echo=FALSE, fig.width=3.5, fig.height=3.5}
+```{r echo=FALSE, fig.width=3.5, fig.height=3.5, warning=FALSE, comment=""}
 par(mfrow=c(1,2))
+for (i in 1:nrow(chart.master)){
+    if (is.na(chart.master[i,"transform"])){
+        xform<-NULL    
+    } else {xform<-chart.master[i,"transform"]}
+    if (is.na(chart.master[i,"collapse"])){
+        clapse<-NULL    
+    } else {clapse<-chart.master[i,"collapse"]}
+    if (is.na(chart.master[i,"xlab"])){
+        xlabel<-""
+    } else {xlabel<-chart.master[i,"xlab"]}
+    if (is.na(as.numeric(chart.master[i,"hline"]))){
+        horizline<-chart.master[i,"hline"]
+    } else {horizline<-as.numeric(chart.master[i,"hline"])}
+    cht<-std_chart(qcode=chart.master[i,"qcode"],
+              type=chart.master[i,"type"],
+              transform= xform,
+              collapse = clapse,
+              logscale = chart.master[i,"logscale"],
+              main=chart.master[i,"main"],
+              xlab=xlabel,
+              ylab=chart.master[i,"ylab"],
+              recession_shading = chart.master[i,"recession_shading"],
+              hline = horizline, 
+              trend=chart.master[i,"trend"])
+    print(cht)
+}
 
-std_chart(qcode="FRED/GDPC96",
-          logscale="log10",
-          main="Real Gross Domestic Product (GDP) Value",
-          ylab="Billions of Dollars",
-          trend="log")
-
-std_chart(qcode="FRED/GDPC96",
-          transform="annpct",
-          main="Real Gross Domestic Product (GDP) % Change",
-          ylab="Annual % Change",
-          hline="mean",
-          trend="linear")
-
-std_chart(qcode="FRED/CPIAUCSL",
-          transform="annpct",
-          main="Inflation: CPI - All Items",
-          ylab="Annual % Change",
-          hline="mean")
-
-std_chart(qcode="FRED/CPILFESL",
-          transform="annpct",
-          main="Core Inflation: CPI x Food and Energy",
-          ylab="Annual % Change",
-          hline="mean")
-
-std_chart(qcode="FRED/UNRATE",
-          main="Unemployment Rate",
-          ylab="%",
-          hline="mean")
-
-std_chart(qcode="FRED/ALTSALES",
-          main="Auto & Light Truck Sales",
-          ylab="Millions of Units",
-          hline="mean",
-          trend="linear")
-
-std_chart(qcode="FRED/MEHOINUSA672N",
-          main="Real Median Household Income",
-          ylab="Dollars",
-          hline="mean")
-
-std_chart(qcode="FRED/DSPI",
-          logscale="log2",
-          main="Disposable Personal Income",
-          ylab="Billions of Dollars",
-          trend="log")
-
-std_chart(qcode="FRED/HOUST",
-          main="Housing Starts: New Privately Owned",
-          ylab="Thousands of Units",
-          hline="mean")
-
-std_chart(qcode="FRED/T10YIE",
-          main="10Yr Breakeven Inflation Rate",
-          ylab="%",
-          hline="mean")
-
-std_chart(qcode="FRED/CP",
-          logscale="log2",
-          main="Corporate Profits After-Tax",
-          ylab="Billions of Dollars",
-          trend="log")
-
-std_chart(qcode="FRED/STLFSI",
-          main="St. Louis Fed Fin'l Stress Index",
-          ylab="Index",
-          hline=0)
-
-std_chart(qcode="CHRIS/CME_CL1",
-          main="Oil: WTI Crude",
-          ylab="Price",
-          collapse="monthly",
-          hline=0)
-
-std_chart(qcode="CHRIS/ICE_B1",
-          main="Oil: Brent Crude",
-          ylab="Price",
-          collapse="monthly",
-          hline=0)
-
-std_chart(qcode="MULTPL/SHILLER_PE_RATIO_MONTH",
-          main="Valuation: Shiller P/E",
-          ylab="P/E",
-          hline="mean")
-
-std_chart(qcode="FRED/DGS10",
-          main="Interest Rates: 10Yr Tsy Const Mat",
-          ylab="Rate %",
-          hline="mean")
-
-std_chart(qcode="FRED/DGS2",
-          main="Interest Rates: 2Yr Tsy Const Mat",
-          ylab="Rate %",
-          hline="mean")
-
-std_chart(qcode="FRED/DTB3",
-          main="Interest Rates: 3Mo Tsy Bill",
-          ylab="Rate %",
-          hline="mean")
-
-std_chart(qcode="CBOE/VIX",
-          main="Volatility: VIX",
-          ylab="VIX Index",
-          hline="mean")
-
-std_chart(qcode="FRED/DTWEXM",
-          main="US Dollar v Major Currencies",
-          ylab="Trade-Wtd Index",
-          hline="mean")
-
-std_chart(qcode="FRED/DTWEXB",
-          main="US Dollar v Broad",
-          ylab="Trade-Wtd Index",
-          hline="mean")
-
-std_chart(qcode="YAHOO/INDEX_GSPC",
-          main="S&P 500 Index",
-          ylab="Index",
-          logscale = "log2",
-          trend="log")
 ```
-
+   
 Source: [Quandl](www.quandl.com) (codes include: FRED/GDPC96, FRED/CPIAUCSL, FRED/CPILFESL, FRED/UNRATE, FRED/ALTSALES, FRED/MEHOINUSA672N, FRED/DSPI, FRED/HOUST, FRED/T10YIE, FRED/CP, FRED/STLFSI, CHRIS/CME_CL1, CHRIS/ICE_B1, MULTPL/SHILLER_PE_RATIO_MONTH, FRED/DGS10, FRED/DGS2, FRED/DTB3, CBOE/VIX, FRED/DTWEXM, FRED/DTWEXB, YAHOO/INDEX_GSPC)
 
 Red Tortoise does not guaranty or make any warranties about the accuracy or completeness of this data. Some data may be inaccurate, incomplete or unfit for a particular purpose.  This document does not contain investment advice.

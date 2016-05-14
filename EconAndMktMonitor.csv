@@ -1,0 +1,23 @@
+qcode,type,transform,collapse,logscale,main,xlab,ylab,recession_shading,hline,trend,fun
+FRED/GDPC96,raw,NA,NA,log10,Real Gross Domestic Product (GDP) Value,,Billions of Dollars,TRUE,,log,std_chart
+FRED/GDPC96,raw,annpct,NA,,Real Gross Domestic Product (GDP) % Change,,Annual % Change,TRUE,mean,linear,std_chart
+FRED/CPIAUCSL,raw,annpct,NA,,Inflation: CPI - All Items,,Annual % Change,TRUE,mean,,std_chart
+FRED/CPILFESL,raw,annpct,NA,,Core Inflation: CPI x Food and Energy,,Annual % Change,TRUE,mean,,std_chart
+FRED/UNRATE,raw,NA,NA,,Unemployment Rate,,%,TRUE,mean,,std_chart
+FRED/ALTSALES,raw,NA,NA,,Auto & Light Truck Sales,,Millions of Units,TRUE,mean,linear,std_chart
+FRED/MEHOINUSA672N,raw,NA,NA,,Real Median Household Income,,Dollars,TRUE,mean,,std_chart
+FRED/DSPI,raw,NA,NA,log2,Disposable Personal Income,,Billions of Dollars,TRUE,,log,std_chart
+FRED/HOUST,raw,NA,NA,,Housing Starts: New Privately Owned,,Thousands of Units,TRUE,mean,,std_chart
+FRED/T10YIE,raw,NA,NA,,10Yr Breakeven Inflation Rate,,%,TRUE,mean,,std_chart
+FRED/CP,raw,NA,NA,log2,Corporate Profits After-Tax,,Billions of Dollars,TRUE,,log,std_chart
+FRED/STLFSI,raw,NA,NA,,St. Louis Fed Fin'l Stress Index,,Index,TRUE,0,,std_chart
+CHRIS/CME_CL1,raw,NA,monthly,,Oil: WTI Crude,,Price,TRUE,0,,std_chart
+CHRIS/ICE_B1,raw,NA,monthly,,Oil: Brent Crude,,Price,TRUE,0,,std_chart
+MULTPL/SHILLER_PE_RATIO_MONTH,raw,NA,NA,,Valuation: Shiller P/E,,P/E,TRUE,mean,,std_chart
+FRED/DGS10,raw,NA,NA,,Interest Rates: 10Yr Tsy Const Mat,,Rate %,TRUE,mean,,std_chart
+FRED/DGS2,raw,NA,NA,,Interest Rates: 2Yr Tsy Const Mat,,Rate %,TRUE,mean,,std_chart
+FRED/DTB3,raw,NA,NA,,Interest Rates: 3Mo Tsy Bill,,Rate %,TRUE,mean,,std_chart
+CBOE/VIX,raw,NA,NA,,Volatility: VIX,,VIX Index,TRUE,mean,,std_chart
+FRED/DTWEXM,raw,NA,NA,,US Dollar v Major Currencies,,Trade-Wtd Index,TRUE,mean,,std_chart
+FRED/DTWEXB,raw,NA,NA,,US Dollar v Broad,,Trade-Wtd Index,TRUE,mean,,std_chart
+YAHOO/INDEX_GSPC,raw,NA,NA,log2,S&P 500 Index,,Index,TRUE,,log,std_chart
