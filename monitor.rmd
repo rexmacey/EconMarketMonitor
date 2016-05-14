@@ -21,6 +21,61 @@ library(xts)
 library(tis)
 Quandl.api_key(Sys.getenv("QUANDL_TOKEN"))
 
+std_chart1<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
+                    main=NULL,xlab="",ylab="",recession_shading=TRUE, hline=NULL,
+                    trend=NULL){
+    data<-Quandl(qcode,type=type,transform,collapse)
+    if (trend=="log"){
+        data.trend<-data.frame(y=log(data$VALUE),x=as.numeric(data$DATE))
+        new<-data.frame(x=data.trend$x)
+        expo.mdl<-lm(y~x,data=data.trend)
+        expo.pred<-predict(expo.mdl,new)
+        data.trend<-data.frame(DATE=data$DATE,TREND=exp(expo.pred))
+    }
+    if (trend=="linear"){
+        data.trend<-data.frame(y=data$VALUE,x=as.numeric(data$DATE))
+        new<-data.frame(x=data.trend$x)
+        expo.mdl<-lm(y~x,data=data.trend)
+        expo.pred<-predict(expo.mdl,new)
+        data.trend<-data.frame(DATE=data$DATE,TREND=expo.pred)
+    }
+    if(recession_shading){
+            recessions<-nberDates()
+            temp<-as.Date(as.character(recessions),"%Y%m%d")
+            recessions<-data.frame(Start=temp[seq(1,nrow(recessions))],
+                                   End=temp[(nrow(recessions)+1):(nrow(recessions)*2)])
+            recessions.trim<-subset(recessions,End>=min(data$DATE))
+            if (nrow(recessions.trim)<1) {
+                recession.shading<-FALSE # no recessions to shade
+            } else {
+                if (recessions.trim$Start[1]<min(data$DATE)) {recessions.trim$Start[1]<-min(data$DATE)}
+            }
+            
+    }
+    out<-ggplot(data=data)+geom_line(aes(x=DATE,y=VALUE),color="red")+ 
+        labs(title=main,x=xlab,y=ylab)+
+        scale_fill_manual(values=cbPalette) 
+    out<- out + theme_bw()
+    if (!is.null(logscale))  {
+        out<-out + scale_y_continuous(trans = logscale)
+    }    
+    if (recession_shading) {
+        out<-out + geom_rect(data=recessions.trim,
+                   aes(xmin=Start,xmax=End,ymin=min(data$VALUE),ymax=Inf), fill="darkgray",alpha=0.2)}
+    if (!is.null(hline)){
+        if (is.numeric(hline)){
+            out<-out+geom_hline(yintercept=hline, col="lightblue")    
+        } else {
+            temp<-do.call(hline,list(data$VALUE))
+            out<-out+geom_hline(yintercept=temp, col="lightblue")
+        }
+    }
+    if (!is.null(trend)){
+        out<-out+geom_line(aes(x=DATE,y=TREND,color="darkgray"),data=data.trend)
+    }
+    return(out)
+}
+
 std_chart<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
                     main=NULL,xlab="",ylab="",recession_shading=TRUE, hline=NULL){
     data<-Quandl(qcode,type=type,transform,collapse)
@@ -48,7 +103,13 @@ std_chart<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
         out<-out + geom_rect(data=recessions.trim,
                    aes(xmin=Start,xmax=End,ymin=min(data$VALUE),ymax=Inf), fill="darkgray",alpha=0.2)}
     if (!is.null(hline)){
-        out<-out+geom_hline(yintercept=hline, col="lightblue")
+        if (is.numeric(hline)){
+            out<-out+geom_hline(yintercept=hline, col="lightblue")    
+        } else {
+            temp<-do.call(hline,list(data$VALUE))
+            out<-out+geom_hline(yintercept=temp, col="lightblue")
+        }
+        
     }
     return(out)
 }
@@ -58,17 +119,22 @@ std_chart<-function(qcode,type="raw",transform=NULL,collapse=NULL,logscale=NULL,
 
 ```{r echo=FALSE, fig.width=3.5, fig.height=3.5}
 par(mfrow=c(1,2))
-logscale<-"log10"
-main="Gross Domestic Product (GDP) Value"
-xlab=""
-ylab="Billions of Dollars"
-qcode<-"FRED/GDP"
-std_chart(qcode,logscale=logscale,main=main,xlab=xlab,ylab=ylab)
 
-logscale<-NULL
-main="Gross Domestic Product (GDP) % Change"
-ylab<-"% Change"
-std_chart(qcode,transform="rdiff",logscale=logscale,main=main,xlab=xlab,ylab=ylab)
+std_chart(qcode=code<-"FRED/GDP",
+          transform="rdiff",
+          logscale<-"log10",
+          main="Gross Domestic Product (GDP) Value",
+          xlab="",
+          ylab="Billions of Dollars",
+          hline=NULL)
+
+std_chart(qcode=code<-"FRED/GDP",
+          transform="rdiff",
+          logscale<-NULL,
+          main="Gross Domestic Product (GDP) % Change",
+          xlab="",
+          ylab="% Change",
+          hline=0)
 
 std_chart(qcode=code<-"FRED/CPIAUCSL",
           transform="rdiff",
@@ -89,8 +155,65 @@ std_chart(qcode=code<-"FRED/CPILFESL",
 std_chart(qcode=code<-"FRED/UNRATE",
           transform=NULL,
           logscale=NULL,
-          main="Core Inflation: CPI x Food and Energy",
+          main="Unemployment Rate",
           xlab="",
-          ylab="% Change",
+          ylab="%",
+          hline="mean")
+
+std_chart(qcode=code<-"FRED/ALTSALES",
+          transform=NULL,
+          logscale=NULL,
+          main="Auto & Light Truck Sales",
+          xlab="",
+          ylab="Millions of Units",
+          hline="mean")
+
+std_chart(qcode=code<-"FRED/MEHOINUSA672N",
+          transform=NULL,
+          logscale=NULL,
+          main="Real Median Household Income",
+          xlab="",
+          ylab="Dollars",
+          hline="mean")
+
+std_chart(qcode=code<-"FRED/DSPI",
+          transform=NULL,
+          logscale="log2",
+          main="Disposable Personal Income",
+          xlab="",
+          ylab="Billions of Dollars",
+          hline=NULL)
+
+std_chart(qcode=code<-"FRED/HOUST",
+          transform=NULL,
+          logscale=NULL,
+          main="Housing Starts: New Privately Owned",
+          xlab="",
+          ylab="Thousands of Units",
+          hline="mean")
+
+std_chart(qcode=code<-"FRED/T10YIE",
+          transform=NULL,
+          logscale=NULL,
+          main="10Yr Breakeven Inflation Rate",
+          xlab="",
+          ylab="Rate %",
+          hline="mean")
+
+std_chart1(qcode=code<-"FRED/CP",
+          transform=NULL,
+          logscale="log2",
+          main="Corporate Profits After Tax",
+          xlab="",
+          ylab="Billions of Dollars",
+          hline=NULL,
+          trend="log")
+
+std_chart(qcode=code<-"FRED/STLFSI",
+          transform=NULL,
+          logscale=NULL,
+          main="St. Louis Fed Fin'l Stress Idx",
+          xlab="",
+          ylab="Index",
           hline=0)
 ```
